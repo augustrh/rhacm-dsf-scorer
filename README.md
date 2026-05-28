@@ -1,0 +1,33 @@
+# rhacm-dsf-scorer
+
+A sample scoring plugin for the [ACM Dynamic Scoring Framework](https://github.com/open-cluster-management-io/addon-contrib/tree/main/dynamic-scoring-framework). Scores managed clusters based on CPU idle capacity queried from Prometheus via Thanos.
+
+## What it does
+
+The scorer runs as a deployment on each managed cluster (deployed via ManifestWork from the hub) and exposes an HTTP endpoint returning a placement score based on real-time CPU availability. The hub's DSF addon reads these scores and feeds them into ACM Placement decisions.
+
+## Structure
+
+```
+app/                  Python scorer application
+  main.py             HTTP server, Prometheus query, score calculation
+  schemas/            Pydantic models for DSF scoring API
+manifests/
+  dynamicscorer.yaml          DSF DynamicScorer CR (hub)
+  dynamicscoringconfig.yaml   DSF config (hub)
+  manifestwork.yaml.example   ManifestWork template (copy and fill in before use)
+  load-generator.yaml         Optional load generator for testing
+Dockerfile
+```
+
+## Usage
+
+1. Copy `manifests/manifestwork.yaml.example` to `manifests/manifestwork.yaml`
+2. Fill in `<YOUR_MANAGED_CLUSTER_NAME>`, `<YOUR_PROMETHEUS_SERVICE_ACCOUNT_TOKEN>`, and `<YOUR_CLUSTER_DOMAIN>`
+3. Apply the ManifestWork from the hub — it deploys the scorer onto the managed cluster
+4. Apply `dynamicscorer.yaml` and `dynamicscoringconfig.yaml` on the hub to register the scorer with DSF
+
+## Prerequisites
+
+- RHACM 2.10+ with DSF addon enabled
+- Managed clusters with OpenShift monitoring (Thanos Querier) available

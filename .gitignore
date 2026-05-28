@@ -1,0 +1,6 @@
+manifests/manifestwork.yaml
+manifests/manifestwork.yamls*
+file
+__pycache__/
+*.pyc
+.env

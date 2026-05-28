@@ -1,0 +1,21 @@
+apiVersion: dynamic-scoring.open-cluster-management.io/v1alpha1
+kind: DynamicScorer
+metadata:
+  name: rhacm-cpu-scorer
+  namespace: open-cluster-management
+spec:
+  description: CPU idle score from OCP built-in cluster monitoring
+  configURL: http://rhacm-scorer-dynamic-scoring.apps.dsftest4.sandbox867.opentlc.com/config
+  configSyncMode: Full
+  location: Internal
+  scoreDestination: AddOnPlacementScore
+  scoreDimensionFormat: "${instance}"
+  source:
+    host: https://thanos-querier.openshift-monitoring.svc:9091
+    path: /api/v1/query_range
+    auth:
+      tokenSecretRef:
+        name: prometheus-token
+        key: token
+  scoring:
+    path: /scoring

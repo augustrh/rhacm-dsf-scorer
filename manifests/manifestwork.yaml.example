@@ -1,0 +1,90 @@
+apiVersion: work.open-cluster-management.io/v1
+kind: ManifestWork
+metadata:
+  name: rhacm-dsf-scorer
+  namespace: <YOUR_MANAGED_CLUSTER_NAME>
+spec:
+  workload:
+    manifests:
+      - apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: rhacm-scorer
+          namespace: dynamic-scoring
+
+      - apiVersion: v1
+        kind: Secret
+        metadata:
+          name: prometheus-token
+          namespace: dynamic-scoring
+        stringData:
+          # Generate this token from the managed cluster:
+          # kubectl create token rhacm-scorer -n dynamic-scoring --duration=8760h
+          token: <YOUR_PROMETHEUS_SERVICE_ACCOUNT_TOKEN>
+
+      - apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: rhacm-scorer-monitoring
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: cluster-monitoring-view
+        subjects:
+          - kind: ServiceAccount
+            name: rhacm-scorer
+            namespace: dynamic-scoring
+
+      - apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: rhacm-scorer
+          namespace: dynamic-scoring
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              app: rhacm-scorer
+          template:
+            metadata:
+              labels:
+                app: rhacm-scorer
+            spec:
+              serviceAccountName: rhacm-scorer
+              containers:
+                - name: rhacm-scorer
+                  image: quay.io/augustrh/rhacm-dsf-scorer:latest
+                  imagePullPolicy: Always
+                  ports:
+                    - containerPort: 8000
+                  env:
+                    - name: PROMETHEUS_HOST
+                      value: "https://thanos-querier.openshift-monitoring.svc:9091"
+                    - name: PROMETHEUS_QUERY
+                      value: 'avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100'
+
+      - apiVersion: v1
+        kind: Service
+        metadata:
+          name: rhacm-scorer
+          namespace: dynamic-scoring
+        spec:
+          selector:
+            app: rhacm-scorer
+          ports:
+            - protocol: TCP
+              port: 8000
+              targetPort: 8000
+
+      - apiVersion: route.openshift.io/v1
+        kind: Route
+        metadata:
+          name: rhacm-scorer
+          namespace: dynamic-scoring
+        spec:
+          host: rhacm-scorer-dynamic-scoring.apps.<YOUR_CLUSTER_DOMAIN>
+          to:
+            kind: Service
+            name: rhacm-scorer
+          port:
+            targetPort: 8000
