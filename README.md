@@ -1,6 +1,6 @@
 # rhacm-dsf-scorer
 
-A sample scoring plugin for the [ACM Dynamic Scoring Framework](https://github.com/open-cluster-management-io/addon-contrib/tree/main/dynamic-scoring-framework). Scores managed clusters based on CPU idle capacity queried from Prometheus via Thanos.
+A sample scoring plugin for the [OCM Dynamic Scoring Framework](https://github.com/open-cluster-management-io/addon-contrib/tree/main/dynamic-scoring-framework) to work with ACM. Scores managed clusters based on CPU idle capacity queried from Prometheus via Thanos.
 
 ## What it does
 
