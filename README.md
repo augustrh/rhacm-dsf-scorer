@@ -22,10 +22,16 @@ Dockerfile
 
 ## Usage
 
-1. Copy `manifests/manifestwork.yaml.example` to `manifests/manifestwork.yaml`
-2. Fill in `<YOUR_MANAGED_CLUSTER_NAME>`, `<YOUR_PROMETHEUS_SERVICE_ACCOUNT_TOKEN>`, and `<YOUR_CLUSTER_DOMAIN>`
-3. Apply the ManifestWork from the hub — it deploys the scorer onto the managed cluster
-4. Apply `dynamicscorer.yaml` and `dynamicscoringconfig.yaml` on the hub to register the scorer with DSF
+1. Build the image from the `Dockerfile` and push it to your own registry:
+   ```bash
+   docker build -t your-registry/rhacm-dsf-scorer:latest .
+   docker push your-registry/rhacm-dsf-scorer:latest
+   ```
+2. Copy `manifests/manifestwork.yaml.example` to `manifests/manifestwork.yaml`
+3. Fill in `<YOUR_MANAGED_CLUSTER_NAME>`, `<YOUR_PROMETHEUS_SERVICE_ACCOUNT_TOKEN>`, and `<YOUR_CLUSTER_DOMAIN>`
+4. Update the `image:` field in `manifestwork.yaml` to point to your registry
+5. Apply the ManifestWork from the hub — it deploys the scorer onto the managed cluster
+6. Apply `dynamicscorer.yaml` and `dynamicscoringconfig.yaml` on the hub to register the scorer with DSF
 
 ## Prerequisites
 
