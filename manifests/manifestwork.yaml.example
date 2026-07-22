@@ -62,6 +62,10 @@ spec:
                       value: "https://thanos-querier.openshift-monitoring.svc:9091"
                     - name: PROMETHEUS_QUERY
                       value: 'avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100'
+                    - name: CLUSTER_REGION
+                      value: "<YOUR_CLUSTER_REGION>"
+                    - name: REGION_BIAS
+                      value: '{"ap-northeast-1": 15, "us-east-1": 0}'
 
       - apiVersion: v1
         kind: Service

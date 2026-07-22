@@ -1,3 +1,4 @@
+import json
 import os
 import requests
 import uvicorn
@@ -15,6 +16,9 @@ PROMETHEUS_QUERY = os.getenv(
 )
 SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
+CLUSTER_REGION = os.getenv("CLUSTER_REGION", "")
+REGION_BIAS = json.loads(os.getenv("REGION_BIAS", "{}"))
+
 app = FastAPI()
 
 
@@ -24,6 +28,11 @@ def _prometheus_token() -> str:
             return f.read().strip()
     except FileNotFoundError:
         return os.getenv("PROMETHEUS_TOKEN", "")
+
+
+def _apply_region_bias(score: int) -> int:
+    bias = REGION_BIAS.get(CLUSTER_REGION, 0)
+    return max(0, min(100, score + bias))
 
 
 def _query_prometheus() -> list[dict]:
@@ -43,7 +52,7 @@ def _query_prometheus() -> list[dict]:
         for r in results:
             metric = r.get("metric", {})
             value = float(r.get("value", [0, 0])[1])
-            scores.append({"metric": metric, "score": int(value)})
+            scores.append({"metric": metric, "score": _apply_region_bias(int(value))})
         return scores
     except Exception as exc:
         print(f"Prometheus query failed: {exc}")
@@ -58,11 +67,10 @@ async def scoring(payload: ScoringPayload, request: Request):
     scores = _query_prometheus()
 
     if not scores:
-        # Fall back to agent-provided time series if Prometheus query failed
         for series in payload.data:
             values = [float(v[1]) for v in series.values]
             avg = sum(values) / len(values) if values else 0
-            scores.append({"metric": series.metric, "score": int(avg)})
+            scores.append({"metric": series.metric, "score": _apply_region_bias(int(avg))})
 
     return {"results": scores}
 
