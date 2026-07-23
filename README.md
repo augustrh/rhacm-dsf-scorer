@@ -85,6 +85,8 @@ uswest-dsf:us-west-2:-10
 
 That's the only file you edit. All scripts read from it.
 
+This demo uses AWS, but the scorer works with any cloud provider or mix of providers. Add GCP, Azure, or on-prem clusters to `clusters.conf` and the region detection and bias logic extend naturally.
+
 ### Deploy
 
 ```bash
