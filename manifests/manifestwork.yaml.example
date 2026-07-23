@@ -65,7 +65,7 @@ spec:
                     - name: CLUSTER_REGION
                       value: "<YOUR_CLUSTER_REGION>"
                     - name: REGION_BIAS
-                      value: '{"ap-northeast-1": 15, "us-east-1": 0}'
+                      value: '{"ap-northeast-1": 15, "us-east-1": 0, "us-west-2": -10}'
 
       - apiVersion: v1
         kind: Service
