@@ -1,147 +1,145 @@
-# rhacm-dsf-scorer
+# DSF Scorer Demo
 
-A sample scoring plugin for the [OCM Dynamic Scoring Framework](https://github.com/open-cluster-management-io/dynamic-scoring-framework) (DSF) running on Red Hat Advanced Cluster Management. Scores managed clusters based on real-time CPU idle capacity **and** configurable region-aware bias — so Placement can prefer clusters closer to your end users.
+A working demo of a custom scoring plugin for the [OCM Dynamic Scoring Framework](https://github.com/open-cluster-management-io/dynamic-scoring-framework) (DSF) on Red Hat Advanced Cluster Management.
+
+Scores managed clusters by combining **real-time CPU capacity** with **region-aware business policy** — then DSF publishes those scores as `AddOnPlacementScores` so Placement can route workloads to the best cluster automatically.
 
 Built for the KubeCon Japan 2026 booth demo: [Your Fleet, Your Rules](https://events.linuxfoundation.org/kubecon-cloudnativecon-japan/).
 
-## What it does
+## The demo in 30 seconds
 
-The scorer runs as a deployment on each managed cluster and exposes an HTTP endpoint that:
+Three managed clusters in different AWS regions. Each gets a scorer that reads CPU idle from Prometheus and applies a configurable region bias:
 
-1. **Queries Prometheus** (via Thanos Querier) for real-time CPU idle percentage across nodes
-2. **Applies a region bias** — a configurable per-region score adjustment (e.g. +15 for `ap-northeast-1`) that lets you express placement preferences like "prefer clusters near Tokyo"
-3. **Returns a score 0–100** that DSF publishes as an `AddOnPlacementScore` on the hub
+```
+$ bash scripts/06-demo.sh scores
 
-Placement uses these scores alongside its built-in prioritizers (Balance, Steady, Allocatable CPU/Memory) to decide where workloads land.
+--- dsf-1 ---
+  us-east-1: 84        (base 84, bias +0)
 
-### Why region bias?
+--- dsf-2 ---
+  us-west-2: 75        (base 85, bias -10)
 
-CPU idle tells you which cluster has capacity. But capacity isn't the only thing that matters — latency, data residency, cost, and compliance all factor into real-world placement. The region bias is a simple example of **external context** shaping placement decisions. Your scorer could call any external API (cost feeds, carbon indexes, compliance engines, MCP servers) before returning a score. DSF doesn't care where the number comes from — it just publishes it.
+--- dsf-apac ---
+  ap-northeast-1: 100  (base 85, bias +15, capped)
+```
+
+Generate CPU load on the Tokyo cluster and watch its score drop in real time. When it falls below the US clusters, Placement flips — workloads move away from Tokyo. Stop the load and Tokyo wins again.
+
+CPU idle tells you **capacity**. Region bias tells you **preference**. Your scorer can call any external signal — cost feeds, carbon indexes, compliance engines — before returning a score. DSF doesn't care where the number comes from.
 
 ## How it works
 
 ```
-┌─────────────────────────────────────────────┐
-│  Managed Cluster (e.g. ap-northeast-1)      │
-│                                             │
-│  Prometheus ──► Scorer ──► Score (0-100)    │
-│  (CPU idle)     + region bias               │
-│                                             │
-└──────────────────────┬──────────────────────┘
-                       │
-                       ▼
-              AddOnPlacementScore
-              (published to hub)
-                       │
-                       ▼
-              Placement Decision
-              (best cluster wins)
+                          Hub
+                           │
+                    DynamicScorer CR
+                    (configURL → /config)
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+         ┌─────────┐ ┌─────────┐ ┌─────────┐
+         │  dsf-1  │ │  dsf-2  │ │dsf-apac │
+         │us-east-1│ │us-west-2│ │ap-ne-1  │
+         ├─────────┤ ├─────────┤ ├─────────┤
+         │Prom─►Agent│Prom─►Agent│Prom─►Agent
+         │    ↓     │ │    ↓     │ │    ↓     │
+         │ Scorer   │ │ Scorer   │ │ Scorer   │
+         │ bias: +0 │ │ bias:-10 │ │ bias:+15 │
+         └────┬─────┘ └────┬─────┘ └────┬─────┘
+              │            │            │
+              ▼            ▼            ▼
+         AddOnPlacementScore (per cluster on hub)
+                           │
+                    Placement Decision
+                    (highest score wins)
 ```
+
+1. The DSF agent on each cluster queries local Prometheus for CPU idle
+2. Agent sends that data to the scorer's `/scoring` endpoint
+3. Scorer detects the cluster's AWS region from the Prometheus instance labels and applies the configured bias
+4. Agent publishes the biased score as an `AddOnPlacementScore` on the hub
+5. Placement uses the scores to pick the best cluster
+
+## Quick start
+
+### Prerequisites
+
+- RHACM 2.13+ with the [DSF addon](https://github.com/open-cluster-management-io/dynamic-scoring-framework) installed
+- 2+ managed clusters with OpenShift monitoring
+- `oc` CLI logged into the hub cluster
+- A container registry you can push to (default: `quay.io/augustrh/rhacm-dsf-scorer`)
+
+### Run it
+
+```bash
+git clone https://github.com/augustrh/rhacm-dsf-scorer.git
+cd rhacm-dsf-scorer
+
+# Extract managed cluster kubeconfigs from Hive secrets
+bash scripts/extract-kubeconfigs.sh
+
+# Build, deploy, register, verify — everything
+bash scripts/setup-all.sh
+```
+
+Or run each step individually — see [`scripts/README.md`](scripts/README.md).
+
+### Demo day
+
+```bash
+bash scripts/06-demo.sh scores       # snapshot current scores
+bash scripts/06-demo.sh start        # generate load on dsf-apac
+bash scripts/06-demo.sh watch        # live-stream score changes
+bash scripts/06-demo.sh stop         # remove load generator
+```
+
+## Customize for your environment
+
+The scripts auto-discover cluster domains and generate tokens at runtime. The only thing you configure manually:
+
+**Map your cluster names to AWS regions** in `scripts/03-deploy-scorer.sh`:
+
+```bash
+get_region() {
+  case "$1" in
+    my-east-cluster)  echo "us-east-1" ;;
+    my-west-cluster)  echo "us-west-2" ;;
+    my-apac-cluster)  echo "ap-northeast-1" ;;
+    *)                echo "unknown" ;;
+  esac
+}
+```
+
+Then create a `manifests/manifestwork-<cluster-name>.yaml` for each cluster (copy an existing one, change the `namespace`).
+
+## Configuration
+
+Environment variables on the scorer deployment (set in ManifestWork):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PROMETHEUS_HOST` | `https://thanos-querier.openshift-monitoring.svc:9091` | Prometheus/Thanos endpoint |
+| `PROMETHEUS_QUERY` | `avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100` | PromQL query |
+| `CLUSTER_REGION` | _(empty)_ | Fallback region if detection from Prometheus labels fails |
+| `REGION_BIAS` | `{}` | JSON map of region-to-score-bias (e.g. `{"ap-northeast-1": 15}`) |
 
 ## Structure
 
 ```
 app/
-  main.py               Scorer: Prometheus query + region bias + HTTP API
-  schemas/
-    scoring.py           Pydantic models for DSF scoring API
-    config.py            Pydantic models for DSF config API
+  main.py                          Scorer (~100 lines of Python)
+  schemas/                         Pydantic models for DSF API
 manifests/
-  dynamicscorer.yaml           DynamicScorer CR (apply on hub)
-  dynamicscoringconfig.yaml    DynamicScoringConfig CR (apply on hub)
-  manifestwork.yaml.example    ManifestWork template (one per managed cluster)
-  load-generator.yaml          Optional: generate CPU load for testing
+  manifestwork-dsf-{1,2,apac}.yaml ManifestWork per managed cluster
+  dynamicscorer.yaml               DynamicScorer CR (hub)
+  dynamicscoringconfig.yaml        DynamicScoringConfig CR (hub)
+  load-generator.yaml              CPU stress pod for demo
+scripts/                           Automation (see scripts/README.md)
 Dockerfile
 ```
-
-## Quick start
-
-### 1. Build and push
-
-```bash
-docker build -t your-registry/rhacm-dsf-scorer:latest .
-docker push your-registry/rhacm-dsf-scorer:latest
-```
-
-### 2. Deploy to each managed cluster
-
-Copy the ManifestWork template and fill in your values:
-
-```bash
-cp manifests/manifestwork.yaml.example manifests/manifestwork.yaml
-```
-
-Edit `manifestwork.yaml`:
-- `<YOUR_MANAGED_CLUSTER_NAME>` — the cluster namespace on the hub
-- `<YOUR_PROMETHEUS_SERVICE_ACCOUNT_TOKEN>` — generate with:
-  ```bash
-  kubectl create token rhacm-scorer -n dynamic-scoring --duration=8760h
-  ```
-- `<YOUR_CLUSTER_DOMAIN>` — the cluster's apps domain
-- `<YOUR_CLUSTER_REGION>` — the AWS region (or any string you define)
-- `REGION_BIAS` — JSON map of region-to-bias values
-
-Apply from the hub:
-
-```bash
-oc apply -f manifests/manifestwork.yaml
-```
-
-Repeat for each managed cluster (different cluster name, token, domain, and region).
-
-### 3. Register with DSF on the hub
-
-```bash
-oc apply -f manifests/dynamicscorer.yaml
-oc apply -f manifests/dynamicscoringconfig.yaml
-```
-
-### 4. Watch scores flow
-
-```bash
-oc get addonplacementscores -A --watch
-```
-
-## Configuration
-
-All configuration is via environment variables on the scorer deployment:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PROMETHEUS_HOST` | `https://thanos-querier.openshift-monitoring.svc:9091` | Prometheus/Thanos endpoint |
-| `PROMETHEUS_QUERY` | `avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100` | PromQL query |
-| `CLUSTER_REGION` | _(empty)_ | Region identifier for this cluster (e.g. `ap-northeast-1`) |
-| `REGION_BIAS` | `{}` | JSON map of region-to-score-bias (e.g. `{"ap-northeast-1": 15, "us-east-1": 0}`) |
-
-### Example: prefer Tokyo
-
-Deploy to two clusters with:
-- **Japan cluster**: `CLUSTER_REGION=ap-northeast-1`, `REGION_BIAS={"ap-northeast-1": 15, "us-east-1": 0}`
-- **US cluster**: `CLUSTER_REGION=us-east-1`, `REGION_BIAS={"ap-northeast-1": 15, "us-east-1": 0}`
-
-Both clusters idle? Japan scores 15 points higher. Both clusters busy? Japan still gets the edge. Generate load on Japan until its CPU advantage drops below 15 points? US wins. That's the demo.
-
-## Prerequisites
-
-- RHACM 2.16+ with DSF addon enabled (DSF is Developer Preview in ACM 2.16)
-- Managed clusters with OpenShift monitoring (Thanos Querier)
-- The [Dynamic Scoring Framework](https://github.com/open-cluster-management-io/dynamic-scoring-framework) addon installed on the hub
-
-## How this was built
-
-This scorer was developed iteratively using AI-assisted coding (Claude Code). The process:
-
-1. **Started with the gap**: ACM Placement has the `AddOnPlacementScore` API, but nothing producing custom scores from real-world data.
-2. **Built the CPU scorer first**: A minimal Flask/FastAPI app that queries Prometheus and returns a score. ~50 lines of Python.
-3. **Added region bias**: A few lines to express "prefer clusters near our users" — demonstrating that your scorer can incorporate any external signal, not just metrics.
-4. **Packaged for DSF**: Dockerfile, ManifestWork for hub-driven deployment, DynamicScorer/Config CRs.
-5. **Iterated on the demo story**: The scorer exists to show that DSF turns Placement from "score with what we give you" into "score with whatever matters to your business."
-
-The entire scorer is ~80 lines of Python. The framework does the heavy lifting.
 
 ## Related
 
 - [Dynamic Scoring Framework](https://github.com/open-cluster-management-io/dynamic-scoring-framework) — the upstream OCM addon
 - [Open Cluster Management](https://open-cluster-management.io) — the upstream project
 - [Red Hat ACM](https://www.redhat.com/en/technologies/management/advanced-cluster-management) — the downstream product
-- [KubeCon Japan 2026 session](https://kubecon-cloudnativecon-japan-2026.sessionize.com/session/1192623) — "Score-Driven Multi-Cluster Management" by Kazuma Takeuchi (SoftBank) and Joydeep Banerjee (Red Hat)

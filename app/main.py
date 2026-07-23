@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import requests
 import uvicorn
 from fastapi import FastAPI, Request
@@ -12,7 +13,7 @@ PROMETHEUS_HOST = os.getenv(
 )
 PROMETHEUS_QUERY = os.getenv(
     "PROMETHEUS_QUERY",
-    'avg by (node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100',
+    'avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100',
 )
 SA_TOKEN_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 
@@ -30,8 +31,26 @@ def _prometheus_token() -> str:
         return os.getenv("PROMETHEUS_TOKEN", "")
 
 
-def _apply_region_bias(score: int) -> int:
-    bias = REGION_BIAS.get(CLUSTER_REGION, 0)
+def _detect_region(data: list) -> str:
+    """Detect AWS region from instance labels in Prometheus payload data.
+
+    AWS internal DNS encodes the region: us-west-2.compute.internal,
+    ap-northeast-1.compute.internal.  us-east-1 is the exception — it
+    uses .ec2.internal with no region prefix.
+    """
+    for series in data:
+        instance = series.metric.get("instance", "")
+        m = re.search(r'\.([a-z]+-[a-z]+-\d+)\.compute\.internal', instance)
+        if m:
+            return m.group(1)
+    for series in data:
+        if ".ec2.internal" in series.metric.get("instance", ""):
+            return "us-east-1"
+    return CLUSTER_REGION or "unknown"
+
+
+def _apply_bias(score: int, region: str) -> int:
+    bias = REGION_BIAS.get(region, 0)
     return max(0, min(100, score + bias))
 
 
@@ -48,12 +67,13 @@ def _query_prometheus() -> list[dict]:
         )
         resp.raise_for_status()
         results = resp.json().get("data", {}).get("result", [])
-        scores = []
-        for r in results:
-            metric = r.get("metric", {})
-            value = float(r.get("value", [0, 0])[1])
-            scores.append({"metric": metric, "score": _apply_region_bias(int(value))})
-        return scores
+        if not results:
+            return []
+        values = [float(r.get("value", [0, 0])[1]) for r in results]
+        avg_idle = sum(values) / len(values)
+        region = CLUSTER_REGION or "unknown"
+        cluster_score = _apply_bias(int(avg_idle), region)
+        return [{"metric": {"node": region}, "score": cluster_score}]
     except Exception as exc:
         print(f"Prometheus query failed: {exc}")
         return []
@@ -61,17 +81,17 @@ def _query_prometheus() -> list[dict]:
 
 @app.post("/scoring", response_model=ScoringResponse)
 async def scoring(payload: ScoringPayload, request: Request):
-    # Query OCP Prometheus directly — the DSF agent may not be able to
-    # authenticate with OCP cluster monitoring, so we collect data ourselves
-    # using the pod's service account token (requires cluster-monitoring-view).
-    scores = _query_prometheus()
-
-    if not scores:
+    if payload.data:
+        region = _detect_region(payload.data)
+        all_values = []
         for series in payload.data:
-            values = [float(v[1]) for v in series.values]
-            avg = sum(values) / len(values) if values else 0
-            scores.append({"metric": series.metric, "score": _apply_region_bias(int(avg))})
+            all_values.extend(float(v[1]) for v in series.values)
+        avg_idle = sum(all_values) / len(all_values) if all_values else 0
+        cluster_score = _apply_bias(int(avg_idle), region)
+        print(f"Scoring from payload: region={region}, avg_idle={avg_idle:.1f}, bias={REGION_BIAS.get(region, 0)}, score={cluster_score}")
+        return {"results": [{"metric": {"node": region}, "score": cluster_score}]}
 
+    scores = _query_prometheus()
     return {"results": scores}
 
 
