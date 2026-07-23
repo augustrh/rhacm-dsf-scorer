@@ -8,7 +8,7 @@ This demo shows a custom DSF scorer that combines real-time CPU capacity with li
 
 ## Setup
 
-Everything should be running before the demo starts. Audience sees the dashboard with scores already live.
+You need an ACM hub with four managed clusters matching `clusters.conf`. Everything should be running before the demo starts. Audience sees the dashboard with scores already live.
 
 ```bash
 # Terminal 1 — feed the dashboard
