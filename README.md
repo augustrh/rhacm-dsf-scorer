@@ -175,6 +175,10 @@ dashboard/
 DEMO.md                               Four-beat demo run sheet
 ```
 
+## Disclaimer
+
+This project is a community demonstration and is not supported under any Red Hat subscription or support agreement. It is provided as-is for educational and proof-of-concept purposes. For guidance on the Dynamic Scoring Framework, Advanced Cluster Management, or production deployment options, please contact your Red Hat account team.
+
 ## Related
 
 - [Dynamic Scoring Framework](https://github.com/open-cluster-management-io/dynamic-scoring-framework) — the upstream OCM addon
