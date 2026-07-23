@@ -5,7 +5,7 @@ metadata:
   namespace: open-cluster-management
 spec:
   description: CPU idle score from OCP built-in cluster monitoring
-  configURL: http://rhacm-scorer-dynamic-scoring.apps.dsf-1.sandbox1812.opentlc.com/config
+  configURL: <CONFIGURL_SET_BY_04_REGISTER_SCORER>
   configSyncMode: Full
   location: Internal
   scoreDestination: AddOnPlacementScore

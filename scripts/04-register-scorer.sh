@@ -2,13 +2,15 @@
 # Step 5: Register the scorer with DSF on the hub
 # Updates configURL in dynamicscorer.yaml to point to the first cluster's Route
 # Usage: bash scripts/04-register-scorer.sh [primary-cluster]
-# Default: dsf-1
+# Default: first cluster from clusters.conf
 
 set -euo pipefail
 
-PRIMARY="${1:-dsf-1}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MANIFESTS_DIR="$SCRIPT_DIR/../manifests"
+source "$SCRIPT_DIR/lib.sh"
+
+PRIMARY="${1:-$(first_cluster)}"
+MANIFESTS_DIR="$REPO_ROOT/manifests"
 KUBECONFIG_FILE="/tmp/${PRIMARY}-kubeconfig.yaml"
 
 echo "=== Step 4: Register Scorer on Hub ==="

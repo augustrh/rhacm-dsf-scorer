@@ -1,11 +1,14 @@
 #!/bin/bash
 # Step 6: Verify the full DSF scorer deployment
 # Usage: bash scripts/05-verify.sh [cluster1 cluster2 ...]
-# Default: dsf-1 dsf-2 dsf-apac
+# Default: all clusters from clusters.conf
 
 set -euo pipefail
 
-CLUSTERS="${@:-dsf-1 dsf-2 dsf-apac}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
+CLUSTERS="${@:-$(cluster_names)}"
 
 echo "=== Step 5: Verify ==="
 

@@ -10,10 +10,16 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
 
 echo "========================================="
 echo "  DSF Demo Setup — KubeCon Japan 2026"
 echo "========================================="
+echo ""
+echo "Clusters from clusters.conf:"
+for name in $(cluster_names); do
+  echo "  $name  ($(get_region "$name"), bias=$(get_bias "$name"))"
+done
 echo ""
 
 # Pre-flight

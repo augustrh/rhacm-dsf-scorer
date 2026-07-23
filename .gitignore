@@ -1,6 +1,5 @@
-manifests/manifestwork.yaml
-manifests/manifestwork.yamls*
-file
+manifests/generated/
 __pycache__/
 *.pyc
 .env
+dashboard/scores.json

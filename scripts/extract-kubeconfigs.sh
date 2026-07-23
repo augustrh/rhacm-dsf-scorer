@@ -1,9 +1,12 @@
 #!/bin/bash
 # Extract kubeconfigs for all DSF managed clusters
 # Usage: bash scripts/extract-kubeconfigs.sh [cluster1 cluster2 ...]
-# Default: dsf-1 dsf-2 dsf-apac
+# Default: all clusters from clusters.conf
 
-CLUSTERS="${@:-dsf-1 dsf-2 dsf-apac}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/lib.sh"
+
+CLUSTERS="${@:-$(cluster_names)}"
 
 for cluster in $CLUSTERS; do
   secret=$(oc get secrets -n "$cluster" -o name | grep admin-kubeconfig)

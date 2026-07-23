@@ -22,6 +22,8 @@ REGION_BIAS = json.loads(os.getenv("REGION_BIAS", "{}"))
 
 app = FastAPI()
 
+_policy = {"blocked": [], "adjustments": {}}
+
 
 def _prometheus_token() -> str:
     try:
@@ -50,8 +52,11 @@ def _detect_region(data: list) -> str:
 
 
 def _apply_bias(score: int, region: str) -> int:
+    if region in _policy["blocked"]:
+        return 0
     bias = REGION_BIAS.get(region, 0)
-    return max(0, min(100, score + bias))
+    adjustment = _policy["adjustments"].get(region, 0)
+    return max(0, min(100, score + bias + adjustment))
 
 
 def _query_prometheus() -> list[dict]:
@@ -93,6 +98,28 @@ async def scoring(payload: ScoringPayload, request: Request):
 
     scores = _query_prometheus()
     return {"results": scores}
+
+
+@app.get("/policy")
+async def get_policy():
+    return _policy
+
+
+@app.post("/policy")
+async def set_policy(request: Request):
+    body = await request.json()
+    _policy["blocked"] = body.get("blocked", [])
+    _policy["adjustments"] = body.get("adjustments", {})
+    print(f"Policy updated: {_policy}")
+    return _policy
+
+
+@app.delete("/policy")
+async def clear_policy():
+    _policy["blocked"] = []
+    _policy["adjustments"] = {}
+    print("Policy cleared")
+    return _policy
 
 
 @app.get("/healthz")
