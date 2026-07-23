@@ -108,7 +108,17 @@ Scores recover within ~60s.
 
 > "Everything you just saw is driven by ~100 lines of Python. The scorer queries Prometheus for CPU, detects the region, applies your business policy, and returns a score. DSF publishes it. Placement acts on it. Your fleet, your rules."
 
-Show `app/main.py` if the audience wants to see the code.
+Open the scorer source on screen: https://github.com/augustrh/rhacm-dsf-scorer/blob/main/app/main.py
+
+> "This is it. The whole scorer. One file."
+
+Walk through what they're looking at:
+
+- `/scoring` endpoint -- receives CPU data from the DSF agent, detects the AWS region from Prometheus instance labels, applies bias + live policy, returns a score
+- `/policy` endpoint -- the POST/GET/DELETE you just saw blocking regions and penalizing regions at runtime
+- `/config` endpoint -- tells DSF where to find Prometheus and how often to score
+- `_detect_region()` -- reads EC2 internal DNS patterns to figure out which region the data came from
+- `_apply_bias()` -- combines the raw CPU score with region bias, policy blocks, and adjustments
 
 ## Timing
 
