@@ -31,12 +31,19 @@ echo $SCORER
 
 ## Beat 1 — Bias holds
 
-**What the audience sees:** Four clusters, different scores. Tokyo (ap-northeast-1) is winning.
+**Start in the ACM console.** Click around. Show the audience the product.
 
-**What you say:**
+1. **Clusters page** — show all four managed clusters in Ready state
+2. **Add-ons tab** — click into a cluster, show "dynamic-scoring" listed as an installed addon
+3. **Switch to the dashboard** — now show the live scores
+
+> "This is Advanced Cluster Management. Four clusters across AWS regions — Tokyo, Singapore, US East, US West. You can see Dynamic Scoring is installed as an addon on each one. It's part of the product. Now let's look at what it's actually doing."
+
+**What the audience sees:** Dashboard with four clusters, different scores. Tokyo (ap-northeast-1) is winning.
+
 > "All four clusters have similar CPU capacity. But Tokyo scores highest because our business policy says our users are in Japan — we want workloads there. This isn't a config flag on Placement. It's custom logic in a scorer we wrote. About 100 lines of Python."
 
-No commands needed. Just show the dashboard.
+No commands needed. Console + dashboard.
 
 ## Beat 2 — Data sovereignty
 
