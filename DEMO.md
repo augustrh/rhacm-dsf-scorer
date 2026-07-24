@@ -120,6 +120,17 @@ Walk through what they're looking at:
 - `_detect_region()` -- reads EC2 internal DNS patterns to figure out which region the data came from
 - `_apply_bias()` -- combines the raw CPU score with region bias, policy blocks, and adjustments
 
+## Closing slide — What calls /policy in production?
+
+In this demo we called `/policy` by hand. In production, anything can.
+
+- **Compliance engine** -- regulations change, policy updates automatically
+- **AI anomaly detection** -- model spots trouble, blocks the region before users notice
+- **Cost optimizer** -- penalize expensive regions when budgets tighten
+- **Incident response** -- CloudWatch or PagerDuty alert triggers a score adjustment
+- **Carbon-aware scheduler** -- favor regions running on cleaner energy
+- **Your thing** -- the API is open, the scorer is yours, the logic is whatever you need it to be
+
 ## Timing
 
 | Beat | Duration | Running total |
