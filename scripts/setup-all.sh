@@ -45,8 +45,8 @@ bash "$SCRIPT_DIR/02-install-addon.sh"
 echo ""
 
 # Wait for addon to be available
-echo "Waiting 30s for addon to propagate..."
-sleep 30
+echo "Waiting 60s for addon to propagate..."
+sleep 60
 
 # Step 3+4: Deploy scorer
 echo "Step 3+4: Deploy scorer"
