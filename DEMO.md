@@ -65,15 +65,15 @@ Wait ~60s for scores to update.
 ## Beat 3 — Protected under load
 
 **What you say:**
-> "What if Tokyo gets busy? Does traffic spill over to Singapore?"
+> "What if Tokyo gets busy? Does the next placement land in Singapore?"
 
 ```bash
 bash scripts/06-demo.sh start tokyo-dsf
 ```
 
-**What the audience sees:** Tokyo's score drops. Traffic shifts to US clusters. Singapore stays at 0.
+**What the audience sees:** Tokyo's score drops. US clusters move up in the ranking. Singapore stays at 0.
 
-> "Tokyo is overloaded. The system routes to the next best region — but it NEVER sends traffic to Singapore. Blocked means blocked. You're protected."
+> "Tokyo is under load so its score drops. The next best clusters rise in the ranking, but Singapore stays at zero. Blocked means blocked. Placement will never pick it."
 
 Let it run for ~90s so scores visibly shift.
 
